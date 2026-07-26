@@ -9,31 +9,50 @@
 
 用法：python build_put_yield_page.py
 """
+import csv
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from put_yield_ranking import load_rows, build_ranking, DEFAULT_CSV, BASE
+from put_yield_ranking import load_rows, build_ranking, BASE
 
 OUT_DIR = BASE / "public_put_yield"
 OUT_FILE = OUT_DIR / "index.html"
 
+# 2026-07-26起改用全自動管線(thefew.tw+TDCC集保結算所，免登入免瀏覽器)取代手動XQ匯出。
+# cbput的核心算法只吃cb_price/next_put_date/next_put_price/volume/collateral，完全不碰
+# conv_price，不受thefew轉換價落後除權息調整的問題拖累(詳見[[project-cb-arbitrage-research]])。
+AUTO_CSV = BASE / "xq_cb_master_auto_verified.csv"
+
+# 2026-07-26新增：「攻守一體」標記——正股是否在穩定配息候選名單裡(見stable_dividend_screen.py)。
+# 書中5-4節概念：CB價低於賣回價(守)+本尊穩定配息具股息穿越轉換價效果(攻)，兩者兼具風險報酬最佳。
+STABLE_DIV_CSV = BASE / "stable_dividend_cb_issuers_enriched.csv"
+
 MIN_YTP = -999  # 不預先篩，全部有賣回日的都列出，交給頁面上的分層呈現
 
 
-def row_to_js(r, rank):
+def load_stable_dividend_set():
+    if not STABLE_DIV_CSV.exists():
+        return set()
+    with open(STABLE_DIV_CSV, encoding="utf-8-sig") as f:
+        rows = list(csv.DictReader(f))
+    return {r["stock_code"] for r in rows if r.get("stable_dividend_candidate") == "True"}
+
+
+def row_to_js(r, rank, stable_div_set):
     risk = "ky" if r["_is_ky"] else ""
+    attack_defense = "true" if r.get("stock_code") in stable_div_set else "false"
     return (
         f'    [{rank},"{r["code"]}","{r["name"]}",{r["conv_price"]:.2f},{r["stock_price"]:.2f},'
         f'{r["conv_value"]:.2f},{r["cb_price"]:.2f},{r["_simple_return_pct"]:.2f},'
         f'{r["ytp_pct"]:.2f},"{r["next_put_date"]}",{r["next_put_price"]:.2f},'
-        f'{r["_days_to_put"]},{(r["volume"] or 0):.0f},"{r["collateral"]}","{risk}"],'
+        f'{r["_days_to_put"]},{(r["volume"] or 0):.0f},"{r["collateral"]}","{risk}",{attack_defense}],'
     )
 
 
-def build_tier_js(rows):
-    return "\n".join(row_to_js(r, i + 1) for i, r in enumerate(rows))
+def build_tier_js(rows, stable_div_set):
+    return "\n".join(row_to_js(r, i + 1, stable_div_set) for i, r in enumerate(rows))
 
 
 HEADER_COLS = [
@@ -51,12 +70,14 @@ def build_header_row():
 
 
 def main():
-    rows = load_rows(DEFAULT_CSV)
+    rows = load_rows(AUTO_CSV)
     ranking = build_ranking(rows)
+    stable_div_set = load_stable_dividend_set()
 
     clean = [r for r in ranking if (r["volume"] or 0) > 0 and not r["_is_ky"]]
     ky_only = [r for r in ranking if (r["volume"] or 0) > 0 and r["_is_ky"]]
     stale = [r for r in ranking if (r["volume"] or 0) == 0]
+    n_attack_defense = sum(1 for r in ranking if r.get("stock_code") in stable_div_set)
 
     OUT_DIR.mkdir(exist_ok=True)
     html = HTML_TEMPLATE.format(
@@ -66,15 +87,17 @@ def main():
         clean_count=len(clean),
         ky_count=len(ky_only),
         stale_count=len(stale),
+        attack_defense_count=n_attack_defense,
         top_ytp=f"{ranking[0]['ytp_pct']:.1f}" if ranking else "—",
-        clean_js=build_tier_js(clean),
-        ky_js=build_tier_js(ky_only),
-        stale_js=build_tier_js(stale),
+        clean_js=build_tier_js(clean, stable_div_set),
+        ky_js=build_tier_js(ky_only, stable_div_set),
+        stale_js=build_tier_js(stale, stable_div_set),
         header_row=build_header_row(),
     )
     OUT_FILE.write_text(html, encoding="utf-8")
     print(f"已寫出：{OUT_FILE}")
     print(f"乾淨候選 {len(clean)} / KY股候選 {len(ky_only)} / 零成交候選 {len(stale)}（共 {len(ranking)} 檔可算）")
+    print(f"其中「攻守一體」(正股在穩定配息候選名單裡) {n_attack_defense} 檔")
 
 
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -122,7 +145,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   section.block {{ margin-bottom: 34px; }}
   .block-head {{ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }}
   .block-head h2 {{ font-size: 16px; margin: 0; font-weight: 800; }}
-  .count {{ font-size: 12.5px; color: var(--ink-faint); margin-left: 6px; }}
+  .block-head .count {{ font-size: 12.5px; color: var(--ink-faint); }}
   .block-note {{ font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; line-height: 1.6; }}
   .table-scroll {{ overflow-x: auto; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }}
   table.rank-table {{ width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }}
@@ -142,9 +165,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   table.rank-table td.ytp {{ font-weight: 800; color: var(--accent); }}
   .chip {{ font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; display: inline-flex; margin-left: 6px; }}
   .chip.ky {{ background: var(--hot-soft); color: var(--hot); }}
-  .controls {{ display: flex; align-items: center; margin-bottom: 22px; }}
-  .controls label {{ display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink-soft); cursor: pointer; user-select: none; }}
-  .controls input[type="checkbox"] {{ width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }}
+  .chip.ad {{ background: var(--safe-soft); color: var(--safe); }}
   details.tier {{ background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }}
   details.tier summary {{ cursor: pointer; padding: 14px 16px; font-weight: 700; font-size: 14px; list-style: none; display: flex; align-items: center; justify-content: space-between; }}
   details.tier summary::-webkit-details-marker {{ display: none; }}
@@ -168,7 +189,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       ②公司會不會在賣回日前違約（此表無TCRI信用評等欄位，KY股已額外標註但仍需自行查證公司治理狀況）。
     </p>
     <div class="meta-row">
-      <span><span class="dot"></span>資料來源：XQ全球贏家「可轉債總表」CSV匯出</span>
+      <span><span class="dot"></span>資料來源：thefew.tw個股頁+TDCC集保結算所（免登入全自動抓取，非XQ手動匯出）</span>
       <span>產生日期 {today}</span>
       <span>單日快照，非連續追蹤</span>
     </div>
@@ -181,15 +202,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="stat"><div class="n num">{ky_count}</div><div class="l">KY股候選(有成交)</div></div>
     <div class="stat"><div class="n num" style="color:var(--ink-faint)">{stale_count}</div><div class="l">零成交(舊價，僅供參考)</div></div>
     <div class="stat"><div class="n num" style="color:var(--accent)">{top_ytp}%</div><div class="l">目前最高賣回年化報酬率</div></div>
-  </div>
-
-  <div class="controls">
-    <label><input type="checkbox" id="hideNegativeToggle">隱藏負報酬（隱藏賣回年化報酬率 &lt; 0 的候選，套用於下方三張表）</label>
+    <div class="stat"><div class="n num" style="color:var(--safe)">{attack_defense_count}</div><div class="l">攻守一體候選(正股穩定配息)</div></div>
   </div>
 
   <section class="block">
     <div class="block-head"><h2>乾淨候選 — 今日有成交、非KY股</h2><span class="count" id="cleanCount"></span></div>
-    <p class="block-note">依「賣回年化報酬率」由高到低排序，這批數字最可信，優先看這裡。</p>
+    <p class="block-note">依「賣回年化報酬率」由高到低排序，這批數字最可信，優先看這裡。標<span class="chip ad" style="margin-left:0;">攻守</span>的代表正股在「穩定配息候選名單」裡——CB價低於賣回價保底（守）之外，若正股持續配息觸發轉換價下修並填息，還有「股息穿越轉換價」帶來的上漲空間（攻），詳見頁尾說明。</p>
     <div class="table-scroll"><table class="rank-table">
       <thead><tr>{header_row}</tr></thead>
       <tbody id="cleanRows"></tbody>
@@ -198,7 +216,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <section class="block">
     <details class="tier">
-      <summary><span>KY股候選（有成交，但境外註冊查核力較弱，需額外注意）<span class="count" id="kyCount"></span></span><span class="arrow">▸</span></summary>
+      <summary>KY股候選（有成交，但境外註冊查核力較弱，需額外注意）<span class="arrow">▸</span></summary>
       <div class="table-scroll"><table class="rank-table">
         <thead><tr>{header_row}</tr></thead>
         <tbody id="kyRows"></tbody>
@@ -208,7 +226,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <section class="block">
     <details class="tier">
-      <summary><span>零成交候選（volume=0，CB價格可能是舊價，數字僅供參考）<span class="count" id="staleCount"></span></span><span class="arrow">▸</span></summary>
+      <summary>零成交候選（volume=0，CB價格可能是舊價，數字僅供參考）<span class="arrow">▸</span></summary>
       <div class="table-scroll"><table class="rank-table">
         <thead><tr>{header_row}</tr></thead>
         <tbody id="staleRows"></tbody>
@@ -220,7 +238,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     算法比照悠債網（Yobond）CB賣回報酬率排行榜，已用廣華二KY（102.45→106.12，129天）反算驗證年化數字與XQ原始ytp_pct欄位吻合。<br>
     賣回報酬率＝(最近賣回價格−CB價格)÷CB價格；賣回年化報酬率＝(1+賣回報酬率)^(365/距今天數)−1（即XQ「提前賣回收益率」）。<br>
     本表只反映「公司不違約」情境下的保證報酬，不是無風險套利；違約歷史與KY股風險，詳見本機可轉債套利研究記憶。<br>
-    資料來源：XQ全球贏家（嘉實資訊）「可轉債總表」桌面看盤軟體匯出CSV，非公開API，需人工在XQ按匯出才能更新。本表僅供研究與觀察，非投資建議。
+    資料來源：thefew.tw個股頁（免登入伺服器端渲染）取得CB價格/賣回條款/成交量，交叉搭配TDCC集保結算所官方月報表（月頻率，交叉驗證保管張數用），全程純requests自動抓取，不需人工開XQ匯出、不需登入。<br>
+    「轉換價/CB理論價」欄位取自thefew.tw，對部分CB可能落後未反映除權息調整（已知限制，不影響本表核心算法，僅供參考不代表精確值）；「擔保」欄位為thefew原始「擔保銀行/TCRI信用評等」混合文字，格式不若XQ「無擔保/有擔保」乾淨，需自行判讀。<br>
+    因TDCC月報表約落後1~2個月，極少數最近1~2個月內新上市的CB可能尚未被本表涵蓋；thefew部分CB的「下次提前賣回日」欄位偶有未更新至最新一期的情形，此類CB會被安全排除於排行之外（不會顯示錯誤的高報酬率）。<br>
+    <b>攻守一體徽章</b>：正股在CB存續期間，經MOPS歷史重大訊息「轉換價格調整」標題查證，至少2個不同年度、且調整年數/觀察窗口年數≥60%。這是「正向證據」清單，沒標徽章不代表該正股沒有穩定配息，只代表沒查到可搜尋的官方標題（部分發行人不會為此單獨發公告，屬方法本身的偵測盲區）。<br>
+    本表僅供研究與觀察，非投資建議。
   </footer>
 </div>
 
@@ -237,11 +259,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   function renderRows(id, data) {{
     const el = document.getElementById(id);
-    el.innerHTML = data.map(([rank, code, name, convPrice, stockPrice, convValue, cbPrice, simpleReturn, ytp, putDate, putPrice, days, volume, collateral, risk]) => `
+    el.innerHTML = data.map(([rank, code, name, convPrice, stockPrice, convValue, cbPrice, simpleReturn, ytp, putDate, putPrice, days, volume, collateral, risk, attackDefense]) => `
       <tr>
         <td class="num">${{rank}}</td>
         <td class="num">${{code}}</td>
-        <td>${{name}}${{risk === 'ky' ? '<span class="chip ky">KY</span>' : ''}}</td>
+        <td>${{name}}${{risk === 'ky' ? '<span class="chip ky">KY</span>' : ''}}${{attackDefense ? '<span class="chip ad">攻守</span>' : ''}}</td>
         <td class="num">${{convPrice.toFixed(2)}}</td>
         <td class="num">${{stockPrice.toFixed(2)}}</td>
         <td class="num">${{convValue.toFixed(2)}}</td>
@@ -256,68 +278,39 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </tr>`).join('');
   }}
 
+  renderRows('cleanRows', clean);
+  renderRows('kyRows', kyOnly);
+  renderRows('staleRows', stale);
+  document.getElementById('cleanCount').textContent = clean.length + ' 檔';
+
   const NUMERIC_COLS = new Set([0, 3, 4, 5, 6, 7, 8, 10, 11, 12]);
-  const YTP_COL = 8;
-  let hideNegative = false;
 
-  const TABLES = {{
-    cleanRows: {{ full: clean, sort: {{ idx: null, dir: 1 }} }},
-    kyRows: {{ full: kyOnly, sort: {{ idx: null, dir: 1 }} }},
-    staleRows: {{ full: stale, sort: {{ idx: null, dir: 1 }} }},
-  }};
-
-  function getVisible(tbodyId) {{
-    const t = TABLES[tbodyId];
-    let rows = hideNegative ? t.full.filter(r => r[YTP_COL] >= 0) : t.full.slice();
-    if (t.sort.idx !== null) {{
-      const idx = t.sort.idx;
-      rows.sort((a, b) => {{
-        const va = a[idx], vb = b[idx];
-        const cmp = NUMERIC_COLS.has(idx) ? (va - vb) : String(va).localeCompare(String(vb), 'zh-Hant');
-        return cmp * t.sort.dir;
-      }});
-    }}
-    return rows;
-  }}
-
-  function refresh(tbodyId) {{
-    renderRows(tbodyId, getVisible(tbodyId));
-  }}
-
-  function refreshAll() {{
-    Object.keys(TABLES).forEach(refresh);
-    const visibleClean = getVisible('cleanRows').length;
-    document.getElementById('cleanCount').textContent = visibleClean + ' 檔' + (hideNegative ? `（共 ${{clean.length}} 檔，已隱藏負報酬）` : '');
-    const visibleKy = getVisible('kyRows').length;
-    document.getElementById('kyCount').textContent = hideNegative ? `顯示 ${{visibleKy}}／共 ${{kyOnly.length}} 檔（已隱藏負報酬）` : '';
-    const visibleStale = getVisible('staleRows').length;
-    document.getElementById('staleCount').textContent = hideNegative ? `顯示 ${{visibleStale}}／共 ${{stale.length}} 檔（已隱藏負報酬）` : '';
-  }}
-
-  function attachSort(tbodyId) {{
-    const t = TABLES[tbodyId];
-    const table = document.getElementById(tbodyId).closest('table');
+  function attachSort(tbodyId, data) {{
+    const tbody = document.getElementById(tbodyId);
+    const table = tbody.closest('table');
     const ths = table.querySelectorAll('thead th.sortable');
+    const sortState = {{ idx: null, dir: 1 }};
     ths.forEach(th => {{
       th.addEventListener('click', () => {{
         const idx = parseInt(th.dataset.idx, 10);
-        t.sort.dir = (t.sort.idx === idx) ? t.sort.dir * -1 : 1;
-        t.sort.idx = idx;
-        refresh(tbodyId);
-        ths.forEach(x => {{ x.classList.remove('active'); x.querySelector('.arrow-sort').textContent = '↕'; }});
+        sortState.dir = (sortState.idx === idx) ? sortState.dir * -1 : 1;
+        sortState.idx = idx;
+        data.sort((a, b) => {{
+          const va = a[idx], vb = b[idx];
+          const cmp = NUMERIC_COLS.has(idx) ? (va - vb) : String(va).localeCompare(String(vb), 'zh-Hant');
+          return cmp * sortState.dir;
+        }});
+        renderRows(tbodyId, data);
+        ths.forEach(t => {{ t.classList.remove('active'); t.querySelector('.arrow-sort').textContent = '↕'; }});
         th.classList.add('active');
-        th.querySelector('.arrow-sort').textContent = t.sort.dir === 1 ? '▲' : '▼';
+        th.querySelector('.arrow-sort').textContent = sortState.dir === 1 ? '▲' : '▼';
       }});
     }});
   }}
 
-  Object.keys(TABLES).forEach(attachSort);
-  refreshAll();
-
-  document.getElementById('hideNegativeToggle').addEventListener('change', (e) => {{
-    hideNegative = e.target.checked;
-    refreshAll();
-  }});
+  attachSort('cleanRows', clean);
+  attachSort('kyRows', kyOnly);
+  attachSort('staleRows', stale);
 </script>
 </body>
 </html>
