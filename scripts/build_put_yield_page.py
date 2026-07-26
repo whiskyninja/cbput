@@ -130,7 +130,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     -webkit-font-smoothing: antialiased;
   }}
   .num {{ font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", "Consolas", monospace; font-variant-numeric: tabular-nums; }}
-  .wrap {{ max-width: 1520px; margin: 0 auto; padding: 28px 18px 80px; }}
+  .wrap {{ max-width: none; width: 100%; margin: 0 auto; padding: 28px 40px 80px; }}
   header.top {{ padding: 6px 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }}
   .eyebrow {{ font-size: 12px; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; text-transform: uppercase; margin: 0 0 8px; }}
   h1 {{ font-size: clamp(22px, 4.2vw, 30px); line-height: 1.25; margin: 0 0 10px; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }}
