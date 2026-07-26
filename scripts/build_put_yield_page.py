@@ -122,7 +122,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   section.block {{ margin-bottom: 34px; }}
   .block-head {{ display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }}
   .block-head h2 {{ font-size: 16px; margin: 0; font-weight: 800; }}
-  .block-head .count {{ font-size: 12.5px; color: var(--ink-faint); }}
+  .count {{ font-size: 12.5px; color: var(--ink-faint); margin-left: 6px; }}
   .block-note {{ font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; line-height: 1.6; }}
   .table-scroll {{ overflow-x: auto; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }}
   table.rank-table {{ width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }}
@@ -198,7 +198,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <section class="block">
     <details class="tier">
-      <summary>KY股候選（有成交，但境外註冊查核力較弱，需額外注意）<span class="arrow">▸</span></summary>
+      <summary><span>KY股候選（有成交，但境外註冊查核力較弱，需額外注意）<span class="count" id="kyCount"></span></span><span class="arrow">▸</span></summary>
       <div class="table-scroll"><table class="rank-table">
         <thead><tr>{header_row}</tr></thead>
         <tbody id="kyRows"></tbody>
@@ -208,7 +208,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
   <section class="block">
     <details class="tier">
-      <summary>零成交候選（volume=0，CB價格可能是舊價，數字僅供參考）<span class="arrow">▸</span></summary>
+      <summary><span>零成交候選（volume=0，CB價格可能是舊價，數字僅供參考）<span class="count" id="staleCount"></span></span><span class="arrow">▸</span></summary>
       <div class="table-scroll"><table class="rank-table">
         <thead><tr>{header_row}</tr></thead>
         <tbody id="staleRows"></tbody>
@@ -288,6 +288,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     Object.keys(TABLES).forEach(refresh);
     const visibleClean = getVisible('cleanRows').length;
     document.getElementById('cleanCount').textContent = visibleClean + ' 檔' + (hideNegative ? `（共 ${{clean.length}} 檔，已隱藏負報酬）` : '');
+    const visibleKy = getVisible('kyRows').length;
+    document.getElementById('kyCount').textContent = hideNegative ? `顯示 ${{visibleKy}}／共 ${{kyOnly.length}} 檔（已隱藏負報酬）` : '';
+    const visibleStale = getVisible('staleRows').length;
+    document.getElementById('staleCount').textContent = hideNegative ? `顯示 ${{visibleStale}}／共 ${{stale.length}} 檔（已隱藏負報酬）` : '';
   }}
 
   function attachSort(tbodyId) {{

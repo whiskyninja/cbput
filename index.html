@@ -43,7 +43,7 @@
   section.block { margin-bottom: 34px; }
   .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
   .block-head h2 { font-size: 16px; margin: 0; font-weight: 800; }
-  .block-head .count { font-size: 12.5px; color: var(--ink-faint); }
+  .count { font-size: 12.5px; color: var(--ink-faint); margin-left: 6px; }
   .block-note { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; line-height: 1.6; }
   .table-scroll { overflow-x: auto; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
   table.rank-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
@@ -119,7 +119,7 @@
 
   <section class="block">
     <details class="tier">
-      <summary>KY股候選（有成交，但境外註冊查核力較弱，需額外注意）<span class="arrow">▸</span></summary>
+      <summary><span>KY股候選（有成交，但境外註冊查核力較弱，需額外注意）<span class="count" id="kyCount"></span></span><span class="arrow">▸</span></summary>
       <div class="table-scroll"><table class="rank-table">
         <thead><tr><th class="sortable" data-idx="0">#<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="1">代碼<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="2">名稱<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="3">轉換價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="4">現股價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="5">CB理論價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="6">CB價格<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="7">賣回報酬%<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="8">賣回年化%<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="9">最近賣回日<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="10">賣回價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="11">距今天數<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="12">今日量<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="13">擔保<span class="arrow-sort">↕</span></th></tr></thead>
         <tbody id="kyRows"></tbody>
@@ -129,7 +129,7 @@
 
   <section class="block">
     <details class="tier">
-      <summary>零成交候選（volume=0，CB價格可能是舊價，數字僅供參考）<span class="arrow">▸</span></summary>
+      <summary><span>零成交候選（volume=0，CB價格可能是舊價，數字僅供參考）<span class="count" id="staleCount"></span></span><span class="arrow">▸</span></summary>
       <div class="table-scroll"><table class="rank-table">
         <thead><tr><th class="sortable" data-idx="0">#<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="1">代碼<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="2">名稱<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="3">轉換價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="4">現股價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="5">CB理論價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="6">CB價格<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="7">賣回報酬%<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="8">賣回年化%<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="9">最近賣回日<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="10">賣回價<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="11">距今天數<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="12">今日量<span class="arrow-sort">↕</span></th><th class="sortable" data-idx="13">擔保<span class="arrow-sort">↕</span></th></tr></thead>
         <tbody id="staleRows"></tbody>
@@ -409,6 +409,10 @@
     Object.keys(TABLES).forEach(refresh);
     const visibleClean = getVisible('cleanRows').length;
     document.getElementById('cleanCount').textContent = visibleClean + ' 檔' + (hideNegative ? `（共 ${clean.length} 檔，已隱藏負報酬）` : '');
+    const visibleKy = getVisible('kyRows').length;
+    document.getElementById('kyCount').textContent = hideNegative ? `顯示 ${visibleKy}／共 ${kyOnly.length} 檔（已隱藏負報酬）` : '';
+    const visibleStale = getVisible('staleRows').length;
+    document.getElementById('staleCount').textContent = hideNegative ? `顯示 ${visibleStale}／共 ${stale.length} 檔（已隱藏負報酬）` : '';
   }
 
   function attachSort(tbodyId) {
