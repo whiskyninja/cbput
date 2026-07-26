@@ -142,6 +142,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   table.rank-table td.ytp {{ font-weight: 800; color: var(--accent); }}
   .chip {{ font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; display: inline-flex; margin-left: 6px; }}
   .chip.ky {{ background: var(--hot-soft); color: var(--hot); }}
+  .controls {{ display: flex; align-items: center; margin-bottom: 22px; }}
+  .controls label {{ display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink-soft); cursor: pointer; user-select: none; }}
+  .controls input[type="checkbox"] {{ width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }}
   details.tier {{ background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }}
   details.tier summary {{ cursor: pointer; padding: 14px 16px; font-weight: 700; font-size: 14px; list-style: none; display: flex; align-items: center; justify-content: space-between; }}
   details.tier summary::-webkit-details-marker {{ display: none; }}
@@ -178,6 +181,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="stat"><div class="n num">{ky_count}</div><div class="l">KY股候選(有成交)</div></div>
     <div class="stat"><div class="n num" style="color:var(--ink-faint)">{stale_count}</div><div class="l">零成交(舊價，僅供參考)</div></div>
     <div class="stat"><div class="n num" style="color:var(--accent)">{top_ytp}%</div><div class="l">目前最高賣回年化報酬率</div></div>
+  </div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="hideNegativeToggle">隱藏負報酬（隱藏賣回年化報酬率 &lt; 0 的候選，套用於下方三張表）</label>
   </div>
 
   <section class="block">
@@ -249,39 +256,64 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       </tr>`).join('');
   }}
 
-  renderRows('cleanRows', clean);
-  renderRows('kyRows', kyOnly);
-  renderRows('staleRows', stale);
-  document.getElementById('cleanCount').textContent = clean.length + ' 檔';
-
   const NUMERIC_COLS = new Set([0, 3, 4, 5, 6, 7, 8, 10, 11, 12]);
+  const YTP_COL = 8;
+  let hideNegative = false;
 
-  function attachSort(tbodyId, data) {{
-    const tbody = document.getElementById(tbodyId);
-    const table = tbody.closest('table');
+  const TABLES = {{
+    cleanRows: {{ full: clean, sort: {{ idx: null, dir: 1 }} }},
+    kyRows: {{ full: kyOnly, sort: {{ idx: null, dir: 1 }} }},
+    staleRows: {{ full: stale, sort: {{ idx: null, dir: 1 }} }},
+  }};
+
+  function getVisible(tbodyId) {{
+    const t = TABLES[tbodyId];
+    let rows = hideNegative ? t.full.filter(r => r[YTP_COL] >= 0) : t.full.slice();
+    if (t.sort.idx !== null) {{
+      const idx = t.sort.idx;
+      rows.sort((a, b) => {{
+        const va = a[idx], vb = b[idx];
+        const cmp = NUMERIC_COLS.has(idx) ? (va - vb) : String(va).localeCompare(String(vb), 'zh-Hant');
+        return cmp * t.sort.dir;
+      }});
+    }}
+    return rows;
+  }}
+
+  function refresh(tbodyId) {{
+    renderRows(tbodyId, getVisible(tbodyId));
+  }}
+
+  function refreshAll() {{
+    Object.keys(TABLES).forEach(refresh);
+    const visibleClean = getVisible('cleanRows').length;
+    document.getElementById('cleanCount').textContent = visibleClean + ' 檔' + (hideNegative ? `（共 ${{clean.length}} 檔，已隱藏負報酬）` : '');
+  }}
+
+  function attachSort(tbodyId) {{
+    const t = TABLES[tbodyId];
+    const table = document.getElementById(tbodyId).closest('table');
     const ths = table.querySelectorAll('thead th.sortable');
-    const sortState = {{ idx: null, dir: 1 }};
     ths.forEach(th => {{
       th.addEventListener('click', () => {{
         const idx = parseInt(th.dataset.idx, 10);
-        sortState.dir = (sortState.idx === idx) ? sortState.dir * -1 : 1;
-        sortState.idx = idx;
-        data.sort((a, b) => {{
-          const va = a[idx], vb = b[idx];
-          const cmp = NUMERIC_COLS.has(idx) ? (va - vb) : String(va).localeCompare(String(vb), 'zh-Hant');
-          return cmp * sortState.dir;
-        }});
-        renderRows(tbodyId, data);
-        ths.forEach(t => {{ t.classList.remove('active'); t.querySelector('.arrow-sort').textContent = '↕'; }});
+        t.sort.dir = (t.sort.idx === idx) ? t.sort.dir * -1 : 1;
+        t.sort.idx = idx;
+        refresh(tbodyId);
+        ths.forEach(x => {{ x.classList.remove('active'); x.querySelector('.arrow-sort').textContent = '↕'; }});
         th.classList.add('active');
-        th.querySelector('.arrow-sort').textContent = sortState.dir === 1 ? '▲' : '▼';
+        th.querySelector('.arrow-sort').textContent = t.sort.dir === 1 ? '▲' : '▼';
       }});
     }});
   }}
 
-  attachSort('cleanRows', clean);
-  attachSort('kyRows', kyOnly);
-  attachSort('staleRows', stale);
+  Object.keys(TABLES).forEach(attachSort);
+  refreshAll();
+
+  document.getElementById('hideNegativeToggle').addEventListener('change', (e) => {{
+    hideNegative = e.target.checked;
+    refreshAll();
+  }});
 </script>
 </body>
 </html>
