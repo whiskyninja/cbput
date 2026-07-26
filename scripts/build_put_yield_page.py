@@ -130,7 +130,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     -webkit-font-smoothing: antialiased;
   }}
   .num {{ font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", "Consolas", monospace; font-variant-numeric: tabular-nums; }}
-  .wrap {{ max-width: 1040px; margin: 0 auto; padding: 28px 18px 80px; }}
+  .wrap {{ max-width: 1520px; margin: 0 auto; padding: 28px 18px 80px; }}
   header.top {{ padding: 6px 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }}
   .eyebrow {{ font-size: 12px; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; text-transform: uppercase; margin: 0 0 8px; }}
   h1 {{ font-size: clamp(22px, 4.2vw, 30px); line-height: 1.25; margin: 0 0 10px; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }}
@@ -148,17 +148,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .block-head .count {{ font-size: 12.5px; color: var(--ink-faint); }}
   .block-note {{ font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; line-height: 1.6; }}
   .table-scroll {{ overflow-x: auto; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }}
-  table.rank-table {{ width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }}
+  table.rank-table {{ width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; table-layout: auto; }}
   table.rank-table th {{
     text-align: right; font-size: 11px; color: var(--ink-faint); font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.03em; padding: 8px 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--paper-raised);
+    letter-spacing: 0.03em; padding: 8px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--paper-raised);
   }}
   table.rank-table th:nth-child(1), table.rank-table th:nth-child(2), table.rank-table th:nth-child(3) {{ text-align: left; }}
   table.rank-table th.sortable {{ cursor: pointer; user-select: none; }}
   table.rank-table th.sortable:hover {{ color: var(--ink); }}
   table.rank-table th.sortable .arrow-sort {{ margin-left: 4px; font-size: 9px; opacity: 0.35; }}
   table.rank-table th.sortable.active .arrow-sort {{ opacity: 1; color: var(--accent); }}
-  table.rank-table td {{ padding: 8px 10px; border-bottom: 1px solid var(--line-soft); text-align: right; }}
+  table.rank-table td {{ padding: 7px 8px; border-bottom: 1px solid var(--line-soft); text-align: right; }}
   table.rank-table td:nth-child(1) {{ color: var(--ink-faint); }}
   table.rank-table td:nth-child(2) {{ text-align: left; color: var(--ink-faint); }}
   table.rank-table td:nth-child(3) {{ text-align: left; font-weight: 700; }}
