@@ -134,7 +134,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   header.top {{ padding: 6px 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }}
   .eyebrow {{ font-size: 12px; letter-spacing: 0.08em; color: var(--accent); font-weight: 700; text-transform: uppercase; margin: 0 0 8px; }}
   h1 {{ font-size: clamp(22px, 4.2vw, 30px); line-height: 1.25; margin: 0 0 10px; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }}
-  .sub {{ color: var(--ink-soft); font-size: 14.5px; line-height: 1.6; max-width: 68ch; margin: 0; }}
+  .sub {{ color: var(--ink-soft); font-size: 14.5px; line-height: 1.6; max-width: none; margin: 0; }}
   .meta-row {{ display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 12.5px; color: var(--ink-faint); }}
   .meta-row span {{ display: inline-flex; align-items: center; gap: 5px; }}
   .dot {{ width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; }}
