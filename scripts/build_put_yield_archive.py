@@ -16,6 +16,9 @@ cb_price/成交量跟 XQ 對不上（見2026-07-28查證：北基八同日CB價1
 Evan說「偶爾會漏掉」，所以刻意不做「昨天沒資料就自動延用前一天」的假資料填補——
 沒跑這支就是沒有那一天的封存，頁面上的「較前次」永遠比對「最近一次實際存在的封存日」，
 不會出現「較昨日」這種在有缺漏時會講錯話的字眼。
+
+2026-07-28新增：賣回報酬%/賣回年化%改為扣除Evan實付手續費後的淨值(見BUY_FEE_RATE)，
+不再直接沿用XQ原始ytp_pct(那是含手續費前的毛報酬)。JSON裡仍保留*_gross欄位供對照。
 """
 import argparse
 import csv
@@ -38,6 +41,12 @@ DATES_FILE = ARCHIVE_DIR / "dates.json"
 
 sys.path.insert(0, str(REPO_ROOT.parent / "scripts"))
 from put_yield_ranking import load_rows, build_ranking  # noqa: E402
+
+# Evan的CB交易手續費：牌告千分之一(0.1%)打28折，實付0.028%＝0.00028（見[[reference-brokerage-fee-discount]]，
+# 已用華友聯三對帳單101,900×1.00028≈101,928.5 vs 實際扣款-101,928驗證吻合）。
+# 只算買進端手續費：賣回(履約贖回)比照Evan自己驗證過的方法論，視為無手續費——
+# 賣回是透過券商向發行人/集保履約買回，不是市場拋售，不吃這筆買賣手續費。
+BUY_FEE_RATE = 0.1 / 100 * 0.28
 
 
 def infer_date_from_filename(path: Path):
@@ -68,7 +77,16 @@ def parse_raw_xq_csv(raw_csv_path: Path) -> Path:
     return tmp_path
 
 
+def net_returns(cb_price, next_put_price, days_to_put):
+    """買進成本內含手續費(cb_price*(1+BUY_FEE_RATE))，賣回端無手續費，回傳(簡單報酬%淨, 年化%淨)。"""
+    effective_cost = cb_price * (1 + BUY_FEE_RATE)
+    simple_net = (next_put_price - effective_cost) / effective_cost * 100
+    ytp_net = ((1 + simple_net / 100) ** (365 / days_to_put) - 1) * 100
+    return simple_net, ytp_net
+
+
 def row_to_record(r, stable_div_set):
+    simple_net, ytp_net = net_returns(r["cb_price"], r["next_put_price"], r["_days_to_put"])
     return {
         "code": r["code"],
         "name": r["name"],
@@ -76,8 +94,10 @@ def row_to_record(r, stable_div_set):
         "stock_price": r["stock_price"],
         "conv_value": r["conv_value"],
         "cb_price": r["cb_price"],
-        "simple_return_pct": round(r["_simple_return_pct"], 2),
-        "ytp_pct": round(r["ytp_pct"], 2) if r["ytp_pct"] is not None else None,
+        "simple_return_pct": round(simple_net, 2),
+        "simple_return_pct_gross": round(r["_simple_return_pct"], 2),
+        "ytp_pct": round(ytp_net, 2),
+        "ytp_pct_gross": round(r["ytp_pct"], 2) if r["ytp_pct"] is not None else None,
         "next_put_date": r["next_put_date"],
         "next_put_price": r["next_put_price"],
         "days_to_put": r["_days_to_put"],
