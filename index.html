@@ -207,8 +207,9 @@
     const table = tbody.closest('table');
     const ths = table.querySelectorAll('thead th.sortable');
     const state = { idx: 8, dir: -1 }; // 預設依賣回年化%由高到低
-    ths.forEach((th, idx) => {
+    ths.forEach((th) => {
       th.addEventListener('click', () => {
+        const idx = Number(th.dataset.idx);
         state.dir = (state.idx === idx) ? state.dir * -1 : 1;
         state.idx = idx;
         const col = COLUMNS[idx];
