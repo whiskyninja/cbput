@@ -27,7 +27,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent
@@ -85,8 +85,31 @@ def net_returns(cb_price, next_put_price, days_to_put):
     return simple_net, ytp_net
 
 
+def add_business_days(d, n):
+    """從日期d起跳過週六日往後數n個營業日（不排除台灣國定假日，屬保守近似，用來估最晚撥款日）。"""
+    cur = d
+    added = 0
+    while added < n:
+        cur += timedelta(days=1)
+        if cur.weekday() < 5:
+            added += 1
+    return cur
+
+
+# 賣回條款是「基準日後5個營業日內」撥款，不是基準日當天，2026-07-28 Evan問「他要等一到五天才會給你錢啊」
+# 抓到既有算法只算到基準日、漏算撥款等待期。這裡算「悲觀年化」＝假設撥款卡在條款允許的最晚一天，
+# 用「買進日→實際撥款日」的完整持有天數重新換算，天期越短的CB兩者落差越大（見複利年化公式對短天期天數敏感的既有結論）。
+PUT_PAYMENT_BUSINESS_DAYS = 5
+
+
 def row_to_record(r, stable_div_set):
     simple_net, ytp_net = net_returns(r["cb_price"], r["next_put_price"], r["_days_to_put"])
+
+    payment_date = add_business_days(r["_next_put_date"], PUT_PAYMENT_BUSINESS_DAYS)
+    days_to_payment = r["_days_to_put"] + (payment_date - r["_next_put_date"]).days
+    ytp_pessimistic_net = ((1 + simple_net / 100) ** (365 / days_to_payment) - 1) * 100
+    ytp_pessimistic_gross = ((1 + r["_simple_return_pct"] / 100) ** (365 / days_to_payment) - 1) * 100
+
     return {
         "code": r["code"],
         "name": r["name"],
@@ -98,9 +121,13 @@ def row_to_record(r, stable_div_set):
         "simple_return_pct_gross": round(r["_simple_return_pct"], 2),
         "ytp_pct": round(ytp_net, 2),
         "ytp_pct_gross": round(r["ytp_pct"], 2) if r["ytp_pct"] is not None else None,
+        "ytp_pct_pessimistic": round(ytp_pessimistic_net, 2),
+        "ytp_pct_pessimistic_gross": round(ytp_pessimistic_gross, 2),
         "next_put_date": r["next_put_date"],
         "next_put_price": r["next_put_price"],
         "days_to_put": r["_days_to_put"],
+        "days_to_payment": days_to_payment,
+        "payment_date_pessimistic": payment_date.strftime("%Y/%m/%d"),
         "volume": r["volume"] or 0,
         "collateral": r["collateral"] or "",
         "is_ky": r["_is_ky"],
