@@ -133,6 +133,7 @@
     「較前次」比較的對象是「最近一次實際有封存的日期」，不一定是前一個日曆日——因為封存靠人工每天手動匯出XQ資料，偶爾會漏，漏掉的那幾天就沒有封存可比。<br>
     <b>新進榜</b>：該代碼在對照的前次封存裡完全沒有出現（可能是新上市，也可能是那天資料剛好沒抓到）。<b>由零成交轉入</b>：前次封存裡它是零成交(舊價，被摺疊)，這次才出現成交量——請留意這筆成交量夠不夠代表真實可成交價。<br>
     「轉換價/CB理論價」欄位對部分CB可能落後未反映除權息調整（已知限制，不影響本表核心算法，僅供參考不代表精確值）；「擔保」欄位為XQ原始文字，格式不一，需自行判讀。<br>
+    <b>3日均量</b>＝當日成交量與封存內最近1~2個交易日成交量的算術平均；封存天數未滿3天時，用現有天數計算（例如封存剛開始只有1、2天資料，就只平均1、2天）。若某代碼在對照的某天封存裡完全沒有出現（例如那天沒有可算的賣回日），該天不列入平均分母，不會被當成0成交灌水/拉低。<br>
     <b>攻守一體徽章</b>：正股在CB存續期間，經MOPS歷史重大訊息「轉換價格調整」標題查證，至少2個不同年度、且調整年數/觀察窗口年數≥60%。這是「正向證據」清單，沒標徽章不代表該正股沒有穩定配息，只代表沒查到可搜尋的官方標題。<br>
     本表僅供研究與觀察，非投資建議。
   </footer>
@@ -194,6 +195,7 @@
     { label: '賣回價', cls: 'num', html: r => fmt2(r.next_put_price), sortVal: r => r.next_put_price },
     { label: '距今天數', cls: 'num', html: r => r.days_to_put, sortVal: r => r.days_to_put },
     { label: '今日量', cls: 'num', html: r => Math.round(r.volume || 0), sortVal: r => r.volume || 0 },
+    { label: '3日均量', cls: 'num', html: r => (r._volMA3 == null ? '—' : r._volMA3.toFixed(1)), sortVal: r => r._volMA3 ?? -Infinity },
     { label: '擔保', cls: 'num', html: r => r.collateral || '', sortVal: r => r.collateral || '' },
   ];
 
@@ -232,6 +234,26 @@
         th.classList.add('active');
         th.querySelector('.arrow-sort').textContent = state.dir === 1 ? '▲' : '▼';
       });
+    });
+  }
+
+  function buildVolumeMap(snapshot) {
+    const map = {};
+    snapshot.rows.forEach(r => { map[r.code] = r.volume || 0; });
+    return map;
+  }
+
+  async function computeVolumeMA3(rows, selectedDate, dates) {
+    const idx = dates.indexOf(selectedDate);
+    const lookbackDates = [];
+    for (let i = idx - 1; i >= 0 && lookbackDates.length < 2; i--) lookbackDates.push(dates[i]);
+    const lookbackSnapshots = await Promise.all(lookbackDates.map(loadDate));
+    const lookbackMaps = lookbackSnapshots.map(buildVolumeMap);
+    rows.forEach(r => {
+      const vals = [r.volume || 0];
+      lookbackMaps.forEach(m => { if (Object.prototype.hasOwnProperty.call(m, r.code)) vals.push(m[r.code]); });
+      r._volMA3 = vals.reduce((a, b) => a + b, 0) / vals.length;
+      r._volMA3Days = vals.length;
     });
   }
 
@@ -284,6 +306,7 @@
 
     const rows = snapshot.rows.slice();
     computeDeltas(rows, priorSnapshot ? priorSnapshot.rows : null);
+    await computeVolumeMA3(rows, selectedDate, dates);
 
     const clean = rows.filter(r => tierOf(r) === 'clean').sort((a, b) => b.ytp_pct - a.ytp_pct);
     const ky = rows.filter(r => tierOf(r) === 'ky').sort((a, b) => b.ytp_pct - a.ytp_pct);
