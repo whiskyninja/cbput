@@ -190,7 +190,7 @@
     { label: '賣回報酬%', cls: 'num', html: r => fmt2(r.simple_return_pct), sortVal: r => r.simple_return_pct },
     { label: '賣回年化%', cls: 'num ytp', html: r => fmt2(r.ytp_pct), sortVal: r => r.ytp_pct },
     { label: '悲觀年化%', cls: 'num', html: r => fmt2(r.ytp_pct_pessimistic), sortVal: r => r.ytp_pct_pessimistic },
-    { label: 'Δ年化%較前次', cls: 'num', html: deltaCell, sortVal: r => (r._delta === null || r._delta === undefined) ? -Infinity : r._delta },
+    { label: 'Δ年化%', cls: 'num', html: deltaCell, sortVal: r => (r._delta === null || r._delta === undefined) ? -Infinity : r._delta },
     { label: '最近賣回日', cls: 'num', html: r => r.next_put_date, sortVal: r => r.next_put_date },
     { label: '賣回價', cls: 'num', html: r => fmt2(r.next_put_price), sortVal: r => r.next_put_price },
     { label: '距今天數', cls: 'num', html: r => r.days_to_put, sortVal: r => r.days_to_put },
