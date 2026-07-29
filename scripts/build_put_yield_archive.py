@@ -101,9 +101,16 @@ def add_business_days(d, n):
 # 用「買進日→實際撥款日」的完整持有天數重新換算，天期越短的CB兩者落差越大（見複利年化公式對短天期天數敏感的既有結論）。
 PUT_PAYMENT_BUSINESS_DAYS = 5
 
+# 2026-07-29 Evan指出：原本「樂觀版」用days_to_put(到基準日當天)當分母，等於假設撥款0天延遲
+# 當天撥當天到帳，這在現實中不可能發生(不管公司撥款或證券交割，最快都要隔至少1個營業日)。
+# 樂觀版改抓「最快1個營業日」當底線，讓樂觀版變成「現實中真能達成的最佳情況」而非不可能的天花板。
+PUT_PAYMENT_MIN_BUSINESS_DAYS = 1
+
 
 def row_to_record(r, stable_div_set):
-    simple_net, ytp_net = net_returns(r["cb_price"], r["next_put_price"], r["_days_to_put"])
+    payment_date_optimistic = add_business_days(r["_next_put_date"], PUT_PAYMENT_MIN_BUSINESS_DAYS)
+    days_to_put_effective = r["_days_to_put"] + (payment_date_optimistic - r["_next_put_date"]).days
+    simple_net, ytp_net = net_returns(r["cb_price"], r["next_put_price"], days_to_put_effective)
 
     payment_date = add_business_days(r["_next_put_date"], PUT_PAYMENT_BUSINESS_DAYS)
     days_to_payment = r["_days_to_put"] + (payment_date - r["_next_put_date"]).days
