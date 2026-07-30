@@ -188,7 +188,7 @@
     { label: 'CB理論價', cls: 'num', html: r => fmt2(r.conv_value), sortVal: r => r.conv_value ?? -Infinity },
     { label: 'CB價格', cls: 'num', html: r => fmt2(r.cb_price), sortVal: r => r.cb_price },
     { label: '賣回價', cls: 'num', html: r => fmt2(r.next_put_price), sortVal: r => r.next_put_price },
-    { label: '賣回報酬%', cls: 'num', html: r => fmt2(r.simple_return_pct), sortVal: r => r.simple_return_pct },
+    { label: '價差%', cls: 'num', html: r => fmt2(r.simple_return_pct), sortVal: r => r.simple_return_pct },
     { label: '賣回年化%', cls: 'num ytp', html: r => fmt2(r.ytp_pct), sortVal: r => r.ytp_pct },
     { label: '悲觀年化%', cls: 'num', html: r => fmt2(r.ytp_pct_pessimistic), sortVal: r => r.ytp_pct_pessimistic },
     { label: 'Δ年化%', cls: 'num', html: deltaCell, sortVal: r => (r._delta === null || r._delta === undefined) ? -Infinity : r._delta },
