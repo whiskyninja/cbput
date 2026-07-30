@@ -77,6 +77,15 @@ def parse_raw_xq_csv(raw_csv_path: Path) -> Path:
     return tmp_path
 
 
+def to_int_safe(v):
+    if v in (None, ""):
+        return None
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return None
+
+
 def net_returns(cb_price, next_put_price, days_to_put):
     """買進成本內含手續費(cb_price*(1+BUY_FEE_RATE))，賣回端無手續費，回傳(簡單報酬%淨, 年化%淨)。"""
     effective_cost = cb_price * (1 + BUY_FEE_RATE)
@@ -139,6 +148,9 @@ def row_to_record(r, stable_div_set):
         "collateral": r["collateral"] or "",
         "is_ky": r["_is_ky"],
         "attack_defense": r["code"][:4] in stable_div_set,
+        "issued_lots": to_int_safe(r.get("issued_lots")),
+        "remaining_lots": to_int_safe(r.get("remaining_lots")),
+        "converted_pct": r.get("converted_pct"),
     }
 
 
